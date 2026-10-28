@@ -1,0 +1,9 @@
+server:
+  port: 18080
+spring:
+  application:
+    name: im-server
+
+websocket:
+  enable: true
+  port: 18080
