@@ -1,4 +1,4 @@
-package law.im;
+package law.implatform;
 
 /**
  * Hello world!

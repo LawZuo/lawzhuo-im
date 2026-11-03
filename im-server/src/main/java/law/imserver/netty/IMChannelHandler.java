@@ -1,22 +1,36 @@
 package law.imserver.netty;
 
+import cn.hutool.core.util.StrUtil;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.netty.handler.timeout.IdleState;
+import io.netty.handler.timeout.IdleStateEvent;
+import io.netty.util.AttributeKey;
+import law.imcommon.contant.IMRedisKey;
 import law.imcommon.enums.IMCmdType;
+import law.imcommon.enums.IMEventType;
 import law.imcommon.model.IMSendInfo;
+import law.imcommon.model.IMUserEvent;
+import law.imcommon.model.IMUserInfo;
+import law.imcommon.mq.RedisMQTemplate;
+import law.imserver.constant.ChannelAttrKey;
 import law.imserver.netty.processor.AbstractMessageProcessor;
 import law.imserver.netty.processor.ProcessorFactory;
+import law.imserver.util.SpringContextHolder;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.processing.Processor;
+import java.util.Objects;
 
 /**
  * WebSocket 长连接下 文本帧的处理器 实现浏览器发送文本回写 浏览器连接状态监控
  */
 
 @Slf4j
+@RequiredArgsConstructor
 public class IMChannelHandler extends SimpleChannelInboundHandler<IMSendInfo> {
+
 
     /**
      * 读取到消息后进行处理
@@ -28,5 +42,86 @@ public class IMChannelHandler extends SimpleChannelInboundHandler<IMSendInfo> {
         // 创建处理器进行处理
         AbstractMessageProcessor processor = ProcessorFactory.createProcessor(IMCmdType.fromCode(sendInfo.getCmd()));
         processor.process(ctx, processor.transForm(sendInfo.getData()));
+    }
+
+    /**
+     * 出现异常的处理 打印报错日志
+     *
+     * @param ctx   channel上下文
+     * @param cause 异常信息
+     */
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        log.error(cause.getMessage());
+        //关闭上下文
+        //ctx.close();
+    }
+
+    /**
+     * 监控浏览器上线
+     *
+     * @param ctx channel上下文
+     */
+    @Override
+    public void handlerAdded(ChannelHandlerContext ctx) {
+        log.info("【im-server】服务上线，{}连接", ctx.channel().id().asLongText());
+    }
+
+    @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) {
+        // TODO 监听断开连接处理
+        AttributeKey<Long> userIdAttr = AttributeKey.valueOf(ChannelAttrKey.USER_ID);
+        Long userId = ctx.channel().attr(userIdAttr).get();
+        AttributeKey<Integer> terminalAttr = AttributeKey.valueOf(ChannelAttrKey.TERMINAL_TYPE);
+        Integer terminal = ctx.channel().attr(terminalAttr).get();
+        if (Objects.isNull(userId) || Objects.isNull(terminal)) {
+            return;
+        }
+
+        AttributeKey<String> deviceAttr = AttributeKey.valueOf(ChannelAttrKey.DEVICE_ID);
+        String deviceId = ctx.channel().attr(deviceAttr).get();
+        log.info("【im-server】IMChannelHandler：断开连接,userId:{},终端类型:{},通道Id:{}, 设备Id:{}", userId, terminal, ctx.channel().id().asLongText(), deviceId);
+
+
+        String key = IMRedisKey.userServerIdKey(userId, terminal);
+        RedisMQTemplate redisTemplate = SpringContextHolder.getBean(RedisMQTemplate.class);
+        Object serverId = redisTemplate.opsForValue().get(key);
+
+        // 判断一下，避免异地登录导致的误删
+        ChannelHandlerContext context = UserChannelCtxMap.getChannelCtx(userId, terminal);
+        Boolean isSameServer = IMServerGroup.serverId.equals(Long.parseLong(StrUtil.toString(serverId)));
+        if (isSameServer && !Objects.isNull(context) && ctx.channel().id().equals(context.channel().id())) {
+            // 移除channel
+            UserChannelCtxMap.removeChannelCtx(userId, terminal);
+            // 用户下线
+            redisTemplate.delete(key);
+            // 推送用户下线事件给业务层
+            IMUserEvent event = new IMUserEvent();
+            event.setEventType(IMEventType.OFFLINE.code());
+            event.setUserInfo(new IMUserInfo(userId, terminal));
+            key = IMRedisKey.IM_USER_EVENT_QUEUE;
+            redisTemplate.opsForList().rightPush(key, event);
+            log.info("断开连接,userId:{},终端类型:{},{}", userId, terminal, ctx.channel().id().asLongText());
+        }
+
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent) {
+            IdleState state = ((IdleStateEvent)evt).state();
+            if (state == IdleState.READER_IDLE) {
+                // 在规定时间内没有收到客户端的上行数据, 主动断开连接
+                AttributeKey<Long> attr = AttributeKey.valueOf("USER_ID");
+                Long userId = ctx.channel().attr(attr).get();
+                AttributeKey<Integer> terminalAttr = AttributeKey.valueOf(ChannelAttrKey.TERMINAL_TYPE);
+                Integer terminal = ctx.channel().attr(terminalAttr).get();
+                log.info("心跳超时，即将断开连接,用户id:{},终端类型:{} ", userId, terminal);
+                ctx.channel().close();
+            }
+        } else {
+            super.userEventTriggered(ctx, evt);
+        }
+
     }
 }

@@ -10,25 +10,59 @@
     </parent>
 
     <artifactId>im-server</artifactId>
-    <description>Netty服务模块</description>
+    <packaging>jar</packaging>
 
-    <properties>
-        <maven.compiler.source>21</maven.compiler.source>
-        <maven.compiler.target>21</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
+    <description>Netty服务模块</description>
 
     <dependencies>
         <dependency>
             <groupId>law.im</groupId>
             <artifactId>im-common</artifactId>
-            <version>1.0.1</version>
+        </dependency>
+
+        <!-- 只需要 Spring 容器能力，不引入 web/tomcat：WS 由 Netty 自己监听端口 -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <!-- 协议 JSON 编解码 -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!--
+          按需引入 Netty 具体模块，版本统一由 spring-boot-dependencies 管理（4.1.135.Final）。
+          不要再使用 netty-all：它是内含全部 class 的 uber-jar，和分模块 jar 会重复类，导致 NoSuchMethodError。
+        -->
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-codec-http</artifactId>
         </dependency>
         <dependency>
             <groupId>io.netty</groupId>
-            <artifactId>netty-all</artifactId>
-            <version>4.1.42.Final</version>
+            <artifactId>netty-handler</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-transport</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
     </dependencies>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <mainClass>law.imserver.IMServerApplication</mainClass>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
 </project>

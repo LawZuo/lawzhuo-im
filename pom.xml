@@ -1,18 +1,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
-  <groupId>law.im</groupId>
-  <artifactId>LawIM</artifactId>
-  <version>1.0.1</version>
-  <packaging>pom</packaging>
-
-  <name>LawIM</name>
-  <modules>
-    <module>im-platform</module>
-      <module>im-server</module>
-    <module>im-common</module>
-  </modules>
 
   <parent>
     <groupId>org.springframework.boot</groupId>
@@ -21,42 +9,87 @@
     <relativePath/> <!-- lookup parent from repository -->
   </parent>
 
+  <groupId>law.im</groupId>
+  <artifactId>LawIM</artifactId>
+  <version>1.0.1</version>
+  <packaging>pom</packaging>
+
+  <name>LawIM</name>
+
+  <modules>
+    <module>im-common</module>
+    <module>im-platform</module>
+    <module>im-server</module>
+    <module>im-client</module>
+  </modules>
+
   <properties>
-    <project.version>1.0.1</project.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    <spring-boot.version>3.5.16</spring-boot.version>
     <java.version>21</java.version>
     <maven.compiler.release>21</maven.compiler.release>
     <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
     <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
-    <hutool.version>5.8.48</hutool.version>
-    <redisson.version>3.51.0</redisson.version>
-    <okhttp.version>4.12.0</okhttp.version>
+    <!-- 以下依赖 Spring Boot BOM 未托管，版本统一在这里声明 -->
     <fastjson.version>1.2.83_noneautotype</fastjson.version>
+    <mybatis-plus.version>3.5.15</mybatis-plus.version>
+    <druid.version>1.2.22</druid.version>
+    <hutool.version>5.8.48</hutool.version>
+    <redisson.version>3.21.3</redisson.version>
   </properties>
 
+  <!--
+    只在这里集中管理版本：
+    1) 内部模块版本不再在每个子模块里硬编码；
+    2) Spring Boot 3 必须使用 mybatis-plus-spring-boot3-starter（boot2 版不会自动装配）；
+    3) druid 不在 spring-boot-dependencies 中，必须自己管。
+  -->
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>law.im</groupId>
+        <artifactId>im-common</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>law.im</groupId>
+        <artifactId>im-client</artifactId>
+        <version>${project.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.baomidou</groupId>
+        <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
+        <version>${mybatis-plus.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.alibaba</groupId>
+        <artifactId>druid</artifactId>
+        <version>${druid.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>cn.hutool</groupId>
+        <artifactId>hutool-all</artifactId>
+        <version>${hutool.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.alibaba</groupId>
+        <artifactId>fastjson</artifactId>
+        <version>${fastjson.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
 
-
+  <!-- 真正的“所有模块都需要”的依赖：只有 lombok 和测试栈 -->
   <dependencies>
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>
-      <version>1.18.38</version>
       <scope>provided</scope>
     </dependency>
     <dependency>
-      <groupId>org.slf4j</groupId>
-      <artifactId>slf4j-api</artifactId>
-    </dependency>
-    <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>cn.hutool</groupId>
-      <artifactId>hutool-all</artifactId>
-      <version>${hutool.version}</version>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 </project>

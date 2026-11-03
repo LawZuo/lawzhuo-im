@@ -1,4 +1,4 @@
-package law.im;
+package law.implatform;
 
 import junit.framework.Test;
 import junit.framework.TestCase;

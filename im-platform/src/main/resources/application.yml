@@ -1,0 +1,41 @@
+server:
+  port: 19090
+
+spring:
+  application:
+    name: im-platform
+  config:
+    # 从项目根目录的 .env 读取（按 properties 解析，[.properties] 是格式提示）。
+    # 两个路径覆盖不同启动目录：
+    #   java -jar im-platform/target/xxx.jar   → 工作目录是仓库根，命中 ./.env
+    #   mvn -pl im-platform spring-boot:run    → 工作目录是 im-platform/，命中 ../.env
+    # optional: 表示文件不存在时不报错（生产环境只靠真实环境变量）
+    import:
+      - optional:file:./.env[.properties]
+      - optional:file:../.env[.properties]
+  profiles:
+    # 冒号后面是默认值：没有 SPRING_PROFILES_ACTIVE 环境变量时用 dev，
+    # 若写成 ${SPRING_PROFILES_ACTIVE}（无默认），变量未设置时 Spring 会把
+    # 字面量 "${SPRING_PROFILES_ACTIVE}" 当作 profile 名而报 must contain a letter...
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # 地址/端口/库名抽成变量，具体值来自 .env，未提供时用 application-dev.yml 的兜底值
+    url: jdbc:mysql://${mysql.host}:${mysql.port}/${mysql.database}?useSSL=false&useUnicode=true&characterEncoding=utf-8&allowPublicKeyRetrieval=true
+  # RedisTemplate / RedisUtils 由 im-common 的 RedisConfig 自动装配
+  data:
+    redis:
+      timeout: 3s
+  flyway:
+    enabled: true
+    baseline-on-migrate: true # 防止手动建表扫描出错
+
+# JWT（RS256）：私钥只在本服务（签发方），公钥用于验签
+jwt:
+  issuer: im-platform
+  public-key: ${JWT_PUBLIC_KEY:}
+  private-key: ${JWT_PRIVATE_KEY:}
+  accessToken:
+    expireIn: 1800 #半个小时
+  refreshToken:
+    expireIn: 604800 #7天

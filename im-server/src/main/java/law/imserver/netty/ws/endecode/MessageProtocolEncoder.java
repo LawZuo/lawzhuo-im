@@ -17,7 +17,7 @@ public class MessageProtocolEncoder extends MessageToMessageEncoder<IMSendInfo> 
     ) throws Exception {
         ObjectMapper objectMapper = new ObjectMapper();
         String text = objectMapper.writeValueAsString(msg);
-        TextWebSocketFrame frame = new TextWebSocketFrame(text);
-        out.add(text);
+        // 必须放 TextWebSocketFrame；放 String 时下游帧编码器无法处理，写入会静默失败
+        out.add(new TextWebSocketFrame(text));
     }
 }

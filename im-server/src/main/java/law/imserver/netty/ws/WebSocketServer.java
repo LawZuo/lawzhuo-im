@@ -66,10 +66,10 @@ public class WebSocketServer implements IMServer {
                         pipeline.addLast("http-chunked", new ChunkedWriteHandler());
                         // 只接受 /im 路径，并处理握手、Ping/Pong 和关闭帧。
                         pipeline.addLast(new WebSocketServerProtocolHandler("/im"));
-                        // 解码器
-                        pipeline.addLast("encode", new MessageProtocolDecoder());
-                        // 编码器
-                        pipeline.addLast("decode", new MessageProtocolEncoder());
+                        // 解码器：TextWebSocketFrame -> IMSendInfo
+                        pipeline.addLast("decoder", new MessageProtocolDecoder());
+                        // 编码器：IMSendInfo -> TextWebSocketFrame
+                        pipeline.addLast("encoder", new MessageProtocolEncoder());
                         // 处理器
                         pipeline.addLast("handler", new IMChannelHandler());
                     }
@@ -88,8 +88,12 @@ public class WebSocketServer implements IMServer {
             this.ready = true;
 
             log.info("websocket server 初始化完成,端口：{}", port);
-        } catch (InterruptedException e) {
-            log.info("websocket server 初始化异常", e);
+        } catch (Exception e) {
+            // 端口被占用等情况会在这里抛出（BindException 被 sync() 包装成未检查异常），
+            // 不捕获的话 NIO 线程组不会被释放；捕获后释放资源并快速失败，避免进程"活着但不监听"。
+            log.error("websocket server 启动失败,端口：{}", port, e);
+            stop();
+            throw new IllegalStateException("websocket server 启动失败,端口：" + port, e);
         }
     }
 

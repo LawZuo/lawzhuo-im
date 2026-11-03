@@ -37,3 +37,10 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### 本地配置：含数据库/Redis 口令，禁止提交 ###
+.env
+.env.local
+!.env.example
+**/application-dev.yml
+**/application-local.yml

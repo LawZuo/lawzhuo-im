@@ -1,9 +1,35 @@
 server:
-  port: 18080
+  port: 19091
 spring:
   application:
     name: im-server
-
+  config:
+    # 从仓库根目录的 .env 读取 JWT 公钥等配置（与 im-platform 用同一份）
+    import:
+      - optional:file:./.env[.properties]
+      - optional:file:../.env[.properties]
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  # Redis：IMServerGroup 用 im:max_server_id 初始化节点 id，推送队列也在这里
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      password: ${REDIS_PASSWORD:}
+      timeout: 3s
+# 该模块只启动 Netty，不启动 Tomcat（已不依赖 spring-boot-starter-web），
+# 因此下面这个端口就是进程唯一的监听端口，不会再和 server.port 抢同一个号。
 websocket:
   enable: true
-  port: 18080
+  port: 19091
+
+# JWT（RS256）：私钥只在本服务（签发方），公钥用于验签
+jwt:
+  issuer: im-platform
+  public-key: ${JWT_PUBLIC_KEY:}
+  private-key: ${JWT_PRIVATE_KEY:}
+  accessToken:
+    expireIn: 1800 #半个小时
+  refreshToken:
+    expireIn: 604800 #7天
