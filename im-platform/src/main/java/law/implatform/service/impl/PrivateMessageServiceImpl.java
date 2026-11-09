@@ -3,6 +3,7 @@ package law.implatform.service.impl;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -18,7 +19,7 @@ import law.implatform.enums.MessageType;
 import law.implatform.exception.GlobalException;
 import law.implatform.mapper.PrivateMessageMapper;
 import law.implatform.model.dto.PrivateMessageDTO;
-import law.implatform.model.vo.PrivateMessageVO;
+import law.imcommon.model.vo.PrivateMessageVO;
 import law.implatform.util.SecurityUtils;
 import law.implatform.service.FriendService;
 import law.implatform.service.PrivateMessageService;
@@ -26,6 +27,7 @@ import law.imcommon.model.UserSession;
 import law.implatform.util.ConvUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.time.DateUtils;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.framework.AopContext;
@@ -33,9 +35,9 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.Date;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -98,6 +100,47 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         redisTemplate.opsForValue().set(key, message.getId(), Constant.MAX_OFFLINE_MESSAGE_DAYS, TimeUnit.DAYS);
     }
 
+    @Override
+    public List<PrivateMessageVO> loadOfflineMessage(Long minId) {
+        long time = System.currentTimeMillis();
+        UserSession session = SecurityUtils.getSession();
+        // 获取当前用户的消息
+        LambdaQueryWrapper<PrivateMessage> wrapper = new LambdaQueryWrapper<>();
+
+        Date minDate = DateUtils.addDays(new Date(), Math.toIntExact(-Constant.MAX_OFFLINE_MESSAGE_DAYS));
+        wrapper.gt(PrivateMessage::getId, minId);
+        wrapper.ge(PrivateMessage::getSendTime, minDate);
+        wrapper.and(wp -> wp.eq(PrivateMessage::getSendId, session.getUserId()).or()
+                .eq(PrivateMessage::getRecvId, session.getUserId()));
+        wrapper.orderByDesc(PrivateMessage::getId);
+        wrapper.last("limit " + Constant.MAX_OFFLINE_MESSAGE_SIZE);
+        List<PrivateMessage> messages = this.list(wrapper);
+        // 保证每个会话至少会拉到一条消息
+        if (messages.size() >= Constant.MAX_OFFLINE_MESSAGE_SIZE) {
+            messages = appendLastMessageInConversation(messages, minId);
+        }
+        // TODO 过滤删除的消息
+        // 更新消息为送达状态
+        List<Long> messageIds = messages.stream().filter(m -> m.getRecvId().equals(session.getUserId()))
+                .filter(m -> m.getStatus().equals(MessageStatus.PENDING.code())).map(PrivateMessage::getId)
+                .collect(Collectors.toList());
+        if (!messageIds.isEmpty()) {
+            LambdaUpdateWrapper<PrivateMessage> updateWrapper = Wrappers.lambdaUpdate();
+            updateWrapper.in(PrivateMessage::getId, messageIds);
+            updateWrapper.set(PrivateMessage::getStatus, MessageStatus.DELIVERED.code());
+            update(updateWrapper);
+        }
+        // 转换vo
+        List<PrivateMessageVO> vos = messages.stream().map(m -> {
+            PrivateMessageVO vo = new PrivateMessageVO();
+            BeanUtils.copyProperties(m, vo);
+            return vo;
+        }).toList();
+        log.info("拉取离线私聊消息,用户id:{},数量:{},耗时:{},minId:{}", session.getUserId(), vos.size(),
+                System.currentTimeMillis() - time, minId);
+        return vos.stream().sorted(Comparator.comparing(PrivateMessageVO::getId)).collect(Collectors.toList());
+    }
+
     // 获取下一个版本号
     private Long getNextSeqNo(String convKey) {
         String key = StrUtil.join(":", RedisKey.IM_PRIVATE_MESSAGE_MAX_SEQ, convKey);
@@ -147,5 +190,40 @@ public class PrivateMessageServiceImpl extends ServiceImpl<PrivateMessageMapper,
         } catch (Exception e) {
             throw new GlobalException("消息格式异常");
         }
+    }
+
+    List<PrivateMessage> appendLastMessageInConversation(List<PrivateMessage> messages, Long minId) {
+        UserSession session = SecurityUtils.getSession();
+        List<Long> fIds = friendService.findFriendIds();
+        Set<Long> existIds = messages.stream().map(m -> getFriendId(session, m)).collect(Collectors.toSet());
+        // 移除已经拉到消息的会话
+        fIds.removeAll(existIds);
+        if (fIds.isEmpty()) {
+            return messages;
+        }
+        List<String> keys =
+                fIds.stream().map(id -> buildMaxMessageIdKey(session.getUserId(), id)).collect(Collectors.toList());
+        List<Object> maxMessageIds = redisTemplate.opsForValue().multiGet(keys);
+        maxMessageIds =
+                maxMessageIds.stream().filter(id -> !Objects.isNull(id) && Long.parseLong(id.toString()) > minId)
+                        .collect(Collectors.toList());
+        if (maxMessageIds.isEmpty()) {
+            return messages;
+        }
+        LambdaQueryWrapper<PrivateMessage> wrapper = Wrappers.lambdaQuery();
+        Date minDate = DateUtils.addDays(new Date(), Math.toIntExact(-Constant.MAX_OFFLINE_MESSAGE_DAYS));
+        wrapper.ge(PrivateMessage::getSendTime, minDate);
+        wrapper.in(PrivateMessage::getId, maxMessageIds);
+        List<PrivateMessage> lastMessages = this.list(wrapper);
+        messages.addAll(lastMessages);
+        return messages;
+    }
+
+    private Long getFriendId(UserSession session, PrivateMessage message) {
+        return session.getUserId().equals(message.getSendId()) ? message.getRecvId() : message.getSendId();
+    }
+
+    private String buildMaxMessageIdKey(Long userId1, Long userId2) {
+        return StrUtil.join(":", RedisKey.IM_PRIVATE_MESSAGE_MAX_ID, ConvUtil.buildConvKey(userId1, userId2));
     }
 }

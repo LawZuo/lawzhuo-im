@@ -1,4 +1,4 @@
-package law.imserver.netty.task;
+package law.imserver.task;
 
 import law.imcommon.mq.RedisMQConsumer;
 import law.imserver.netty.IMServerGroup;

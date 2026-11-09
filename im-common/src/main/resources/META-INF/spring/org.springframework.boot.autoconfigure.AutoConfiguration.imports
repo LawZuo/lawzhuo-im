@@ -1,3 +1,4 @@
 law.imcommon.redis.RedisConfig
 law.imcommon.mq.RedisMQConfig
+law.imcommon.mq.RedisMQConsumerAutoConfiguration
 law.imcommon.jwt.JwtAutoConfiguration

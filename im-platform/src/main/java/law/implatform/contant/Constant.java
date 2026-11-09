@@ -11,4 +11,9 @@ public class Constant {
      * 离线消息最大拉取时间(天)
      */
     public static final Long MAX_OFFLINE_MESSAGE_DAYS = 60L;
+
+    /**
+     * 离线消息最大拉取数量
+     */
+    public static final Long MAX_OFFLINE_MESSAGE_SIZE = 10000L;
 }

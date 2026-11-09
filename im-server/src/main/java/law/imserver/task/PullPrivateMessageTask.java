@@ -1,4 +1,4 @@
-package law.imserver.netty.task;
+package law.imserver.task;
 
 import law.imcommon.contant.IMRedisKey;
 import law.imcommon.enums.IMCmdType;

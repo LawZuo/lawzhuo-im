@@ -29,7 +29,7 @@ import law.implatform.model.dto.FriendAddDTO;
 import law.implatform.model.dto.FriendTopDTO;
 import law.implatform.model.dto.FriendUpdateDTO;
 import law.implatform.model.vo.FriendVO;
-import law.implatform.model.vo.PrivateMessageVO;
+import law.imcommon.model.vo.PrivateMessageVO;
 import law.implatform.model.vo.UserOnlineVO;
 import law.implatform.util.SecurityUtils;
 import law.implatform.service.FriendService;

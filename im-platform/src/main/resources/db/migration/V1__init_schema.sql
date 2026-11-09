@@ -37,7 +37,7 @@ create table `im_friend`
 create table `im_private_message`
 (
     `id`        bigint      not null auto_increment primary key comment 'id',
-    `local_id`  varchar(32) comment '业务id,由前端生成',
+    `local_id`  varchar(64) comment '业务id,由前端生成',
     `seq_no`    int         not null comment '序列号,单个会话消息的序号连续递增',
     `send_id`   bigint      not null comment '发送用户id',
     `recv_id`   bigint      not null comment '接收用户id',

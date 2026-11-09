@@ -1,6 +1,7 @@
 package law.imserver.netty.processor;
 
 import law.imcommon.enums.IMCmdType;
+import law.imserver.netty.processor.factory.ForceLogoutProcessor;
 import law.imserver.netty.processor.factory.HeartbeatProcessor;
 import law.imserver.netty.processor.factory.LoginMessageProcessor;
 import law.imserver.netty.processor.factory.PrivateMessageProcessor;
@@ -18,6 +19,7 @@ public class ProcessorFactory {
             case LOGIN -> SpringContextHolder.getApplicationContext().getBean(LoginMessageProcessor.class);
             case HEART_BEAT -> SpringContextHolder.getApplicationContext().getBean(HeartbeatProcessor.class);
             case PRIVATE_MESSAGE -> SpringContextHolder.getApplicationContext().getBean(PrivateMessageProcessor.class);
+            case FORCE_LOGOUT -> SpringContextHolder.getApplicationContext().getBean(ForceLogoutProcessor.class);
             default -> null;
         };
     }

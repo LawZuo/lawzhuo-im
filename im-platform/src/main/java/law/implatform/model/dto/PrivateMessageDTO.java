@@ -7,7 +7,6 @@ import lombok.Data;
 import org.hibernate.validator.constraints.Length;
 
 @Data
-@TableName("im_private_message")
 public class PrivateMessageDTO {
 
     /**

@@ -84,8 +84,9 @@ public class IMChannelHandler extends SimpleChannelInboundHandler<IMSendInfo> {
 
 
         String key = IMRedisKey.userServerIdKey(userId, terminal);
-        RedisMQTemplate redisTemplate = SpringContextHolder.getBean(RedisMQTemplate.class);
-        Object serverId = redisTemplate.opsForValue().get(key);
+        // 统一用 MQ 专用的 RedisMQTemplate，避免和普通 RedisTemplate 混用
+        RedisMQTemplate redisMQTemplate = SpringContextHolder.getBean(RedisMQTemplate.class);
+        Object serverId = redisMQTemplate.opsForValue().get(key);
 
         // 判断一下，避免异地登录导致的误删
         ChannelHandlerContext context = UserChannelCtxMap.getChannelCtx(userId, terminal);
@@ -94,13 +95,13 @@ public class IMChannelHandler extends SimpleChannelInboundHandler<IMSendInfo> {
             // 移除channel
             UserChannelCtxMap.removeChannelCtx(userId, terminal);
             // 用户下线
-            redisTemplate.delete(key);
+            redisMQTemplate.delete(key);
             // 推送用户下线事件给业务层
             IMUserEvent event = new IMUserEvent();
             event.setEventType(IMEventType.OFFLINE.code());
             event.setUserInfo(new IMUserInfo(userId, terminal));
             key = IMRedisKey.IM_USER_EVENT_QUEUE;
-            redisTemplate.opsForList().rightPush(key, event);
+            redisMQTemplate.opsForList().rightPush(key, event);
             log.info("断开连接,userId:{},终端类型:{},{}", userId, terminal, ctx.channel().id().asLongText());
         }
 
