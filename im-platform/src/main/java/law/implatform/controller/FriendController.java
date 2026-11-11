@@ -5,7 +5,8 @@ import jakarta.validation.constraints.NotNull;
 import law.imcommon.util.R;
 import law.implatform.annotation.RepeatSubmit;
 import law.implatform.entity.FriendRequest;
-import law.implatform.model.dto.FriendRequestBTO;
+import law.implatform.model.dto.FriendRequestAddBTO;
+import law.implatform.model.dto.FriendRequestHandleBTO;
 import law.implatform.model.vo.FriendVO;
 import law.implatform.service.FriendRequestService;
 import law.implatform.service.FriendService;
@@ -45,13 +46,22 @@ public class FriendController {
     }
 
     /**
-     * 添加好友
-     * 双方建立好友关系
+     * 添加好友 - 发起好友请求
      */
     @RepeatSubmit
-    @PostMapping("/add")
-    public R addFriend(@NotNull(message = "好友id不可为空") @RequestParam Long friendId) {
-        friendService.addFriend(SecurityUtils.getUserId(),friendId);
+    @PostMapping("/request/add")
+    public R addFriend(@Valid @RequestBody FriendRequestAddBTO dto) {
+        friendRequestService.addFriendRequest(dto);
+        return R.success();
+    }
+
+    /**
+     * 处理好友申请
+     */
+    @RepeatSubmit
+    @PostMapping("/request/handle")
+    public R handleFriendRequest(@Valid @RequestBody FriendRequestHandleBTO dto) {
+        friendRequestService.handleFriendRequest(dto);
         return R.success();
     }
 
@@ -62,14 +72,5 @@ public class FriendController {
     public R<List<FriendRequest>> findRequestList() {
         List<FriendRequest> list = friendRequestService.findFriendRequestList();
         return R.success(list);
-    }
-
-    /**
-     * 处理好友申请
-     */
-    @PostMapping("/request/handle")
-    public R handleFriendRequest(@Valid @RequestBody FriendRequestBTO friendRequestBTO) {
-        friendRequestService.handleFriendRequest(friendRequestBTO);
-        return R.success();
     }
 }

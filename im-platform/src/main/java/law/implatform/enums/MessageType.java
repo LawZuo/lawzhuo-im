@@ -27,7 +27,10 @@ public enum MessageType {
     FRIEND_DEL(81, "删除好友"),
     FRIEND_ONLINE(82, "好友在线状态变化"),
     FRIEND_DND(83, "好友免打扰"),
-    FRIEND_TOP(84, "好友会话置顶");
+    FRIEND_TOP(84, "好友会话置顶"),
+    FRIEND_APPLY(85, "好友申请"),
+    FRIEND_ACCEPT(86, "好友申请通过"),
+    FRIEND_REJECT(87, "好友申请被拒绝");
 
     private final Integer code;
 
